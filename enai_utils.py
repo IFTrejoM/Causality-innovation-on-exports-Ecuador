@@ -1,9 +1,15 @@
 import pandas as pd
+import numpy as np
 from dowhy.causal_model import CausalModel
 import statsmodels.api as sm
 from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.genmod.families import Binomial
 from statsmodels.genmod.families.links import Probit
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearnex import patch_sklearn
+patch_sklearn()
+from sklearn.linear_model import LassoCV, RidgeCV
 
 # Function to flatten dictionaries:
 def flatten_dict(data_dict):
@@ -145,3 +151,89 @@ def get_probit_model(X, y, var_weights=None, method=None, cov_type=None):
     
     # Return the summary of the fitted model
     return probit_model
+
+#####
+
+def get_optimal_alpha_lasso(X_train, y_train, alphas=[0.0001, 0.001, 0.01, 0.1, 1, 10, 100], cv=5, max_iter=5000):
+    """
+    Obtain the optimal alpha value for Lasso regression using cross-validation.
+
+    Args:
+    - X_train (pd.DataFrame or array-like): Feature matrix for training.
+    - y_train (pd.Series or array-like): Target vector for training.
+    - alphas_list (list or array-like): List of alpha values to test.
+    - cv (int, optional): Number of cross-validation folds. Default is 5.
+    - max_iter (int, optional): Maximum number of iterations for the optimizer. Default is 5000.
+
+    Returns:
+    float: Optimal alpha value for Lasso.
+    """
+    
+    lasso_cv = LassoCV(alphas=alphas, cv=cv, max_iter=max_iter)
+
+    # Fit the LassoCV model to the scaled data
+    lasso_cv.fit(X_train, y_train)
+
+    # Obtain the optimal alpha for Lasso
+    optimal_alpha_lasso = lasso_cv.alpha_
+    
+    return optimal_alpha_lasso
+
+#####
+
+def get_optimal_alpha_ridge(X_train, y_train, alphas=[0.0001, 0.001, 0.01, 0.1, 1, 10, 100], cv=5):
+    """
+    Obtain the optimal alpha value for Ridge regression using cross-validation.
+
+    Args:
+    - X_train (pd.DataFrame or array-like): Feature matrix for training.
+    - y_train (pd.Series or array-like): Target vector for training.
+    - alphas_list (list or array-like): List of alpha values to test.
+    - cv (int, optional): Number of cross-validation folds. Default is 5.
+    - max_iter (int, optional): Maximum number of iterations for the optimizer. Default is 5000.
+
+    Returns:
+    float: Optimal alpha value for Ridge.
+    """
+    
+    ridge_cv = RidgeCV(alphas=alphas, cv=cv)
+
+    # Fit the RidgeCV model to the scaled data
+    ridge_cv.fit(X_train, y_train)
+
+    # Obtain the optimal alpha for Ridge
+    optimal_alpha_ridge = ridge_cv.alpha_
+    
+    return optimal_alpha_ridge
+
+#####
+
+def plot_coefficients(coefficients, feature_names, title=None):
+    """
+    Grafica los coeficientes de un modelo.
+
+    Args:
+    - coefficients (array-like): Coeficientes del modelo.
+    - feature_names (list): Nombres de las características.
+    - title (str): Título del gráfico.
+    """
+
+    # Ordena los coeficientes y características de mayor a menor
+    sorted_indices = np.argsort(coefficients)
+    sorted_coefficients = coefficients[sorted_indices]
+    sorted_feature_names = np.array(feature_names.to_list())[sorted_indices]
+
+    # Define los colores utilizando una paleta de Seaborn
+    colors = sns.color_palette("husl", len(sorted_coefficients))
+
+    # Crea el gráfico
+    plt.figure(figsize=(10,6))
+    plt.grid(True)
+    plt.barh(sorted_feature_names, sorted_coefficients, color=colors)
+    plt.xlabel('Valor del coeficiente', fontsize=10)
+    plt.ylabel('Variables características', fontsize=10)
+    plt.title(title, fontsize=12)
+    plt.xticks(fontsize=8)
+    plt.yticks(fontsize=8)
+    plt.tight_layout()  # Asegura que todo quede bien en el gráfico
+    plt.show()
